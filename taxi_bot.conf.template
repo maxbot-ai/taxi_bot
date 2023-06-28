@@ -1,6 +1,6 @@
 bind_port=6010
 image_storage_url="https://taxibot.pagekite.me"
-driver_bot_url="https://driver-taxibot.pagekite.me"
-customer_bot_url="https://customer-taxibot.pagekite.me"
+driver_bot_url="http://localhost:6011"
+customer_bot_url="http://localhost:6012"
 openrouteservice_token="5b4ce3517851110001cf624810560a9757164cc3966422712ace79f1"
 upload_file_path="/tmp"

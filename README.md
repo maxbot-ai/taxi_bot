@@ -185,14 +185,9 @@ All fields are required in the current version of the bot.
 
 ## Launch
 
-* In the [pagekite control panel](https://pagekite.net/home), add the `kite` to create another tunnel. For example, `driver-taxiexample.pagekite.me`. To do this, click the `add kite` button
-* Select the port for `DriverBot`, for example, `6011`
-* Run `pagekite`. Set the port and the external address. For example,
-  ```
-  python3 pagekite.py 6011 driver-taxiexample.pagekite.me
-  ```
-* Make sure that `pagekite` has started successfully and created a tunnel
-* Make sure you are in the `taxi_bot` directory
+* In the [pagekite control panel](https://pagekite.net/home), add the `kite` to create another tunnel. For example, `driver-taxiexample.pagekite.me`. To do this, click the `add kite` button.
+* Make sure you are in the `taxi_bot` directory.
+* Select the port for `DriverBot`, for example, `6011`.
 * Run the bot with the command
   ```
   maxbot run --bot taxi_bot.bot:driver --updater=webhooks --host=localhost --port=<BIND_PORT> --public-url=<DRIVER_BOT_PUBLIC_URL>
@@ -201,6 +196,11 @@ All fields are required in the current version of the bot.
   ```
   maxbot run --bot taxi_bot.bot:driver --updater=webhooks --host=localhost --port=6011 --public-url=https://driver-taxiexample.pagekite.me
   ```
+* Run `pagekite`. Set the port and the external address. For example,
+  ```
+  python3 pagekite.py 6011 driver-taxiexample.pagekite.me
+  ```
+* Make sure that `pagekite` has started successfully and created a tunnel.
 
 
 # CustomerBot
@@ -226,8 +226,13 @@ See the appropriate section for the `DriverBot`.
 ## Launch
 
 * In the [pagekite control panel](https://pagekite.net/home), add the `kite` to create another tunnel. For example, `customer-taxiexample.pagekite.me`. To do this, click the `add kite' button.
-* Make sure you are in the `taxi_bot` directory.
 * Select the port for `CustomerBot`, for example, `6012`.
+* For `CustomerBot` it is important to create the tunnel first, and then run the bot (due to the features of Viber and pagekite). Run pagekite. Set the port and the external address, for example,
+  ```
+  python3 pagekite.py 6012 customer-taxiexample.pagekite.me
+  ```
+* Make sure that `pagekite` has started successfully and created a tunnel on `bind_port`.
+* Make sure you are in the `taxi_bot` directory.
 * Run the bot with the command
   ```
   maxbot run --bot taxi_bot.bot:customer --updater=webhooks --host=localhost --port=<BIND_PORT>\ --public-url=<CUSTOMER_BOT_PUBLIC_URL>
@@ -236,11 +241,6 @@ See the appropriate section for the `DriverBot`.
   ```
   maxbot run --bot taxi_bot.bot:customer --updater=webhooks --host=localhost --port=6012 --public-url=https://customer-taxiexample.pagekite.me
   ```
-* Run `pagekite`. Set the `port` and the external address. For example,
-  ```
-  python3 pagekite.py 6012 customer-taxiexample.pagekite.me
-  ```
-* Make sure that `pagekite` has started successfully and created a tunnel on `bind_port`.
 
 # Testing
 
