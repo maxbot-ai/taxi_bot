@@ -1,0 +1,298 @@
+extensions:
+    rest:
+       services:
+         - name: taxi_service
+           base_url: !ENV ${TAXI_BOT_API}
+           timeout: 10
+channels:
+  telegram:
+    api_token: !ENV ${TELEGRAM_CUSTOMER_API_KEY}
+  viber:
+    api_token: !ENV ${VIBER_CUSTOMER_API_KEY}
+    avatar: https://github.com/maxbot-ai/misc/blob/main/logo_blue.png
+    name: TAXI_BOT
+intents:
+  - name: start
+    examples:
+      - start
+      - start off
+      - starting
+      - begin
+      - launch
+  - name: cancel
+    examples:
+      - cancel
+      - cancellation
+      - abolition
+      - repeal
+      - abolishment
+rpc:
+  - method: driver_found
+    params:
+      - name: phone
+        required: true
+      - name: first_name
+        required: true
+      - name: last_name
+        required: false
+      - name: latitude
+        required: true
+      - name: longitude
+        required: true
+      - name: order_id
+        required: true
+      - name: ride_summary
+        required: true
+      - name: to_customer_summary
+        required: true
+      - name: image_url
+        required: true
+  - method: driver_arrived
+    params:
+      - name: order_id
+        required: true
+  - method: ride_started
+    params:
+      - name: order_id
+        required: true
+  - method: ride_completed
+    params:
+      - name: order_id
+        required: true
+  - method: driver_canceled
+    params:
+      - name: order_id
+        required: true
+
+dialog:
+  - condition: intents.start
+    label: start
+    response: |-
+      {% GET "taxi_service://customer/{}/{}".format(dialog.channel_name, dialog.user_id) on_error "continue" %}
+      {% if not rest.ok %}
+        Service is unavailable.
+      {% elif rest.json.customer_id %}
+        {% set slots.phone = rest.json.phone %}
+        {% set slots.customer_id = rest.json.customer_id %}
+        <jump_to node="waiting_start_location" transition="response" />
+      {% else %}
+        <jump_to node="waiting_contact" transition="response" />
+      {% endif %}
+  - condition: true
+    label: start_error
+    response: |-
+      Unknown command (start)
+      <keyboard_button_list text="Click button for start">
+        <buttons>start</buttons>
+      </keyboard_button_list>
+  - condition: false
+    label: start_cancel
+    response: |-
+      <keyboard_button_list text="Click button for start">
+        <buttons>start</buttons>
+      </keyboard_button_list>
+
+  - condition: false
+    label: waiting_contact
+    response: |-
+      <keyboard_button_contact title="Send your phone" text="Could you please send me your contact." />
+    followup:
+      - condition: message.contact
+        label: contact
+        response: |-
+          {% set slots.phone = message.contact.phone_number %}
+          {% POST "taxi_service://customer/{}/{}".format(dialog.channel_name, dialog.user_id) body {
+              "phone": slots.phone
+          } %}
+          {% set slots.customer_id = rest.json.customer_id %}
+          Cool! Now you can order a taxi.
+          <jump_to node="waiting_start_location" transition="response" />
+      - condition: true
+        label: contact_error
+        response: |-
+          Unknown contact format
+          <jump_to node="waiting_contact" transition="response" />
+
+  - condition: false
+    label: waiting_start_location
+    response: |-
+      <keyboard_button_location text="Enter your pick up location." title="My location" />
+    followup:
+      - condition: message.location
+        label: start_location
+        response: |-
+          {% set slots.start_location = message.location %}
+          <jump_to node="waiting_finish_location" transition="response" />
+      - condition: true
+        label: start_location_error
+        response: |-
+          Unknown location format
+          <jump_to node="waiting_start_location" transition="response" />
+
+  - condition: false
+    label: waiting_finish_location
+    response: |-
+      <keyboard_button_remove text="Enter your destination." />
+    followup:
+      - condition: message.location and (
+                     slots.start_location.latitude != message.location.latitude or
+                     slots.start_location.longitude != message.location.longitude
+                   )
+        label: finish_location
+        response: |-
+          {% set slots.finish_location = message.location %}
+          {% POST "taxi_service://customer/{}/order".format(slots.customer_id) body {
+              "start_location": {
+                  "latitude": slots.start_location.latitude,
+                  "longitude": slots.start_location.longitude
+              },
+              "finish_location": {
+                  "latitude": slots.finish_location.latitude,
+                  "longitude": slots.finish_location.longitude
+              }
+          } %}
+          {% set slots.order_id = rest.json.order_id %}
+          <jump_to node="wait_when_driver_found" transition="response" />
+      - condition: message.location
+        label: finish_location_equals_start
+        response: |-
+          Start point equals destination point. Try again.
+          <jump_to node="waiting_finish_location" transition="response" />
+      - condition: true
+        label: finish_location_error
+        response: |-
+          Unknown location format
+          <jump_to node="waiting_finish_location" transition="response" />
+
+  - condition: false
+    label: wait_when_driver_found
+    response: |-
+      <keyboard_button_list text="Finding your ride. It may take several minutes...">
+        <buttons>Cancel</buttons>
+      </keyboard_button_list>
+    followup:
+      - condition: rpc.driver_found and slots.order_id == params.order_id
+        label: driver_found
+        response: |-
+          I've found the driver for you – {{ params.first_name }} {{ params.last_name|default('') }}, phone: {{ params.phone }}<br/>
+          His location is
+          <location
+               latitude="{{ params.latitude }}"
+               longitude="{{ params.longitude }}"
+               horizontal_accuracy="5"  />
+          Distance to you {{ params.to_customer_summary.distance }} km.<br/>
+          Duration to you {{ params.to_customer_summary.duration }} minutes.<br/>
+          Ride distance {{ params.ride_summary.distance }} km.<br/>
+          Ride duration {{ params.ride_summary.duration }} minutes.<br/>
+          Ride price {{ params.ride_summary.price }}$.<br/>
+          Green - route from driver to you.<br/>
+          Blue - your ride route.
+          <image url="{{ params.image_url }}" />
+          {% set slots.duration = params.to_customer_summary.duration %}
+          <jump_to node="waiting_arrival" transition="response" />
+      - condition: intents.cancel
+        label: driver_found_cancel
+        response: |-
+          {% POST "taxi_service://customer/{}/cancel".format(slots.customer_id) body {
+              "order_id": slots.order_id
+          } %}
+          <jump_to node="start_cancel" transition="response" />
+      - condition: true
+        label: driver_found_error
+        response: |-
+          Unknown rpc.driver_found format
+          <jump_to node="wait_when_driver_found" transition="response" />
+
+  - condition: false
+    label: waiting_arrival
+    response: |-
+      {% if slots.duration < 1 %}
+        {% set button_text = "The driver is less than a minute away." %}
+      {% elif slots.duration < 1.5 %}
+        {% set button_text = "The driver is 1 minute away." %}
+      {% elif slots.duration < 60 %}
+        {% set button_text = "The driver is " + (slots.duration)|round|string + " minutes away..." %}
+      {% elif slots.duration < 90 %}
+        {% set button_text = "The driver is 1 hour away." %}
+      {% else %}
+        {% set button_text = "The driver is " + (slots.duration/60)|round|string + " hours away..." %}
+      {% endif %}
+      <keyboard_button_list text="{{ button_text }}">
+        <buttons>Cancel</buttons>
+      </keyboard_button_list>
+    followup:
+      - condition: rpc.driver_arrived and slots.order_id == params.order_id
+        label: arrival
+        response: |-
+          <jump_to node="waiting_start_ride" transition="response" />
+      - condition: intents.cancel
+        label: arrival_cancel
+        response: |-
+          {% POST "taxi_service://customer/{}/cancel".format(slots.customer_id) body {
+              "order_id": slots.order_id
+          } %}
+          <jump_to node="start_cancel" transition="response" />
+      - condition: rpc.driver_canceled and params.order_id == slots.order_id
+        label: arrival_driver_canceled
+        response: |-
+          Driver canceled order.
+          <jump_to node="start_cancel" transition="response" />
+      - condition: true
+        label: arrival_error
+        response: |-
+          Unknown rpc.driver_arrived format
+          <jump_to node="waiting_arrival" transition="response" />
+
+  - condition: false
+    label: waiting_start_ride
+    response: |-
+      <keyboard_button_list text="Your driver has arrived.">
+        <buttons>Cancel</buttons>
+      </keyboard_button_list>
+
+    followup:
+      - condition: rpc.ride_started and slots.order_id == params.order_id
+        label: start_ride
+        response: |-
+          <jump_to node="waiting_complete_ride" transition="response" />
+      - condition: intents.cancel
+        label: start_ride_cancel
+        response: |-
+          {% POST "taxi_service://customer/{}/cancel".format(slots.customer_id) body {
+              "order_id": slots.order_id
+          } %}
+          <jump_to node="start_cancel" transition="response" />
+      - condition: rpc.driver_canceled and params.order_id == slots.order_id
+        label: start_ride_driver_canceled
+        response: |-
+          Driver canceled order.
+          <jump_to node="start_cancel" transition="response" />
+      - condition: true
+        label: start_ride_error
+        response: |-
+          Unknown rpc.ride_started format
+          <jump_to node="waiting_start_ride" transition="response" />
+
+  - condition: false
+    label: waiting_complete_ride
+    response: |-
+      <keyboard_button_remove text="Driving to destination" />
+    followup:
+      - condition: rpc.ride_completed and slots.order_id == params.order_id
+        label: complete_ride
+        response: |-
+          You have arrived.<br/>
+          Your location is
+          <location
+               latitude="{{ slots.finish_location.latitude }}"
+               longitude="{{ slots.finish_location.longitude }}"
+               horizontal_accuracy="10" />
+          Thank you for using our service. We hope you enjoyed your ride.
+          <keyboard_button_list text="Click button to start again.">
+            <buttons>start</buttons>
+          </keyboard_button_list>
+      - condition: true
+        label: complete_ride_error
+        response: |-
+          Unknown rpc.ride_completed format
+          <jump_to node="waiting_complete_ride" transition="response" />

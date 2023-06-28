@@ -1,0 +1,65 @@
+[tool.poetry]
+name = "taxi_bot"
+version = "0.1.0"
+description = ""
+authors = ["Maxbot Team <hello@maxbot.ai>"]
+readme = "README.md"
+
+[tool.poetry.scripts]
+taxi_bot = "taxi_bot.cli:main"
+
+[tool.poetry.dependencies]
+python = ">=3.9, <3.12"
+maxbot = "^0.2.0b2"
+click-config-file = {version = "^0.6.0"}
+Flask-SQLAlchemy = {version = "^3.0.2"}
+haversine = {version = "^2.7.0"}
+openrouteservice = {version = "^2.3.3"}
+plotly = {version = "^5.11.0"}
+webargs = {version = "^8.2.0"}
+requests-toolbelt = {version = "^1.0.0"}
+kaleido = "0.2.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2"
+httpretty = "^1.1.4"
+pytest-asyncio = "^0.20"
+respx = "^0.20"
+black = "^22.3"
+pylint = "^2.13"
+isort = "^5.10"
+pre-commit = "^2.19"
+bandit = "^1.7"
+flake8 = "^4.0"
+flake8-docstrings = "^1.6"
+flake8-bugbear = "^22.9"
+flake8-eradicate = "^1.4"
+flake8-print = "^5.0"
+pep8-naming = "^0.13"
+pytest-cov = "^4.0"
+freezegun = "^1.2.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 99
+target-version = ["py39"]
+
+[tool.pylint.'MESSAGES CONTROL']
+profile = "black"
+disable = ["C0330", "C0114", "C0116"]
+max-line-length = 99
+
+[tool.isort]  # black config
+profile = "black"
+line_length = 99
+
+[tool.bandit]
+targets = ["eaphotobot"]
+exclude_dirs = ["tests"]
+skips = ["B101",]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
